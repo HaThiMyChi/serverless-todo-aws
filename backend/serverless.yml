@@ -1,4 +1,3 @@
-# # TODO: Change the name of the org 
 org: brandonodiwuor
 app: serverless-todo-app
 service: serverless-todo-app
@@ -7,6 +6,8 @@ plugins:
   - serverless-webpack
   - serverless-iam-roles-per-function
   - serverless-plugin-tracing
+  - serverless-reqvalidator-plugin
+  - serverless-aws-documentation
 
 provider:
   name: aws
@@ -39,6 +40,24 @@ provider:
             - xray:PutTraceSegments
           Resource: "*"
 
+custom:
+  documentation:
+    api:
+      info:
+        version: '1.0.0'
+        title: Todo API
+        description: Backend API for Todo Serverless Application
+      tags:
+        -
+          name: Todo
+          description: Todo Management
+    models:
+      - name: CreateTodoRequest
+        contentType: "application/json"
+        schema: ${file(models/create-todo-model.json)}
+      - name: UpdateTodoRequest
+        contentType: "application/json"
+        schema: ${file(models/update-todo-model.json)}
 
 functions:
 
@@ -49,6 +68,11 @@ functions:
     handler: src/lambda/http/getTodos.handler
     events:
       - http:
+          documentation:
+            summary: "Get a User todo"
+            description: "Gets a list of todos belonging to a user"
+            tags:
+              - Todo
           method: get
           path: todos
           cors: true
@@ -63,13 +87,18 @@ functions:
     handler: src/lambda/http/createTodo.handler
     events:
       - http:
+          documentation:
+            summary: "Create todo"
+            description: "Creates a new todo"
+            tags:
+              - Todo
+            requestModels:
+              "application/json": CreateTodoRequest
           method: post
           path: todos
           cors: true
           authorizer: Auth
-          request:
-            schemas:
-              application/json: ${file(models/create-todo-model.json)}
+          reqValidatorName: RequestBodyValidator
     iamRoleStatements:
       - Effect: Allow
         Action:
@@ -80,6 +109,13 @@ functions:
     handler: src/lambda/http/updateTodo.handler
     events:
       - http:
+          documentation:
+            summary: "Update todo"
+            description: "Updates a todo"
+            tags:
+              - Todo
+            requestModels:
+              "application/json": UpdateTodoRequest
           method: patch
           path: todos/{todoId}
           cors: true
@@ -97,6 +133,11 @@ functions:
     handler: src/lambda/http/deleteTodo.handler
     events:
       - http:
+          documentation:
+            summary: "Delete todo"
+            description: "Deletes a todo"
+            tags:
+              - Todo
           method: delete
           path: todos/{todoId}
           cors: true
@@ -111,6 +152,11 @@ functions:
     handler: src/lambda/http/generateUploadUrl.handler
     events:
       - http:
+          documentation:
+            summary: "Generate todo image url"
+            description: "Generate a todo image url and updates the todo"
+            tags:
+              - Todo
           method: post
           path: todos/{todoId}/attachment
           cors: true
@@ -128,6 +174,17 @@ functions:
 
 resources:
   Resources:
+    # Validator for the request body
+    RequestBodyValidator:  
+      Type: "AWS::ApiGateway::RequestValidator"
+      Properties:
+        Name: 'request-body-validator'
+        RestApiId: 
+          Ref: ApiGatewayRestApi
+        ValidateRequestBody: true
+        ValidateRequestParameters: false
+
+    # API Gateway Response
     GatewayResponseDefault4XX:
       Type: AWS::ApiGateway::GatewayResponse
       Properties:
